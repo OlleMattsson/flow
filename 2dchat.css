@@ -1,45 +1,56 @@
-/* CSS declarations go here */
 body, html {
     padding:0px;
     margin:0px;
     height:100%;
 }
 
-#theSpace {
-    border: 1px solid red;
-    padding:0px;
-    margin:0px;
-    height:100%;
-    width:100%;
-    top:0px;
-    left:0px;
-    display:block;
+input:focus,
+select:focus,
+textarea:focus,
+button:focus {
+    outline: none;
 }
 
-#newmessage {
+#newMessage {
+    width:100%;
+    height:100px;
+    display:block;
     position:absolute;
     padding:0px;
     margin:0px;
-
-    width:100%;
     bottom: 0px;
-    height:50px;
-    border: 1px solid blue;
-    display:block;
-    background: lightgray;
+}
+
+#newMessageForm {
+    margin-left: auto;
+    margin-right: auto;
 }
 
 #newMessageField {
-    width:90%;
+    width: 80%;
     line-height: 35px;
-    float:left;
+    margin-left: auto;
+    margin-right: auto;
+    display: block;
+    font-size:15px;
+    border-radius: 5px;
+    border:2px solid darkgrey;
 }
 
-.link {
-    stroke: #ccc;
+#settingsPanel {
+    position:absolute;
+    top: 0px;
+    left: 0px;
+    width:200px;
+    height:50px;
+    z-index: 100;
+    border: 1px solid #3d3d3d;
+    border-radius: 5px;
+    padding:20px;
+
 }
 
-.node text {
-    pointer-events: none;
-    font: 10px sans-serif;
+#settingsPanel label{
+    margin-top:10px;
+    font-size:12px;
 }
