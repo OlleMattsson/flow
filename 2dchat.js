@@ -21,6 +21,7 @@ Meteor.methods({
 });
 
 if (Meteor.isClient) {
+    Meteor.subscribe("messages");
     Session.setDefault("centerX", $(window).width() / 2);
     Session.setDefault("centerY", $(window).height() / 2);
     window.force = d3.layout.force();
@@ -33,7 +34,7 @@ if (Meteor.isClient) {
         newLength,
         now,
         nodeAge,
-        initialLinkStrength = 0.5,
+        initialLinkStrength = 0.1,
         finalLinkStrength = 0.01,
         newLinkStrength;
 
@@ -45,7 +46,16 @@ if (Meteor.isClient) {
             return false;
         },
         "keyup #newMessageField": function() {
-            $("label[for='newMessageField'] span").html(160- $('#newMessageField').val().length);
+            var msgLength = $('#newMessageField').val().length,
+                maxchars = 140;
+
+            $('#newMessageField').val($('#newMessageField').val().substring(0, maxchars));
+
+            /*var tlength = $(this).val().length;
+            remain = maxchars - parseInt(tlength);
+            $('#remain').text(remain);
+*/
+            $("label[for='newMessageField'] span").html(maxchars - msgLength);
         }
     });
 
@@ -61,8 +71,8 @@ if (Meteor.isClient) {
             .gravity(0.05)
             .friction(0.9)
             .charge(-10)
-            .linkStrength(initialLinkStrength)
-            .distance(10)
+            .linkStrength(finalLinkStrength)
+            .distance(50)
             .size([$(window).width(), $(window).height()])
             .on("tick", tick)
             .start();
@@ -116,13 +126,8 @@ if (Meteor.isClient) {
         });
     };
 
-
-
     function tick() {
-        // these definition should be moved out of the tick function =) but it didn't work properly so....
-
-
-        force.stop();
+         force.stop();
 
         if(d3nodes.length > 0) {
             d3nodes[0].x = Session.get("centerX");
@@ -138,10 +143,11 @@ if (Meteor.isClient) {
                 if (newLength < linkMaxLength ) {return newLength;}
                 else {return linkMaxLength;}                        // until it reaches this treshhold
             } else {
-                newLength = (nodeAge) * speed;
-                return newLength * 0.5;
+                newLength = (nodeAge) * speed * 0.7;
+                return newLength;
             }
         })
+           /*
             .linkStrength(function(d){
                 now = Date.now();
                 nodeAge = (now - d.source.timestamp) /1000;
@@ -158,6 +164,7 @@ if (Meteor.isClient) {
                     }                        // until it reaches this treshhold
                 }
             })
+            */
             .charge(function(d) {
                 now = Date.now();
                 nodeAge = (now - d.timestamp) /1000;
@@ -252,6 +259,9 @@ if (Meteor.isClient) {
 }
 
 if (Meteor.isServer) {
+    Meteor.publish("messages", function () {
+        return Messages.find();
+    });
   Meteor.startup(function () {
       var msgCollection = Messages.find();
       if (msgCollection.count() == 0) {

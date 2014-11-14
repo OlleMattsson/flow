@@ -12,7 +12,7 @@
     <div id="newMessage">
         <form id="newMessageForm">
             <input type="text" id="newMessageField">
-            <label for="newMessageField">remaining: <span>160</span></label>
+            <label for="newMessageField">remaining: <span>140</span></label>
         </form>
     </div>
 </template>
@@ -23,13 +23,16 @@
 
 <template name="settings">
     <div id="settingsPanel">
+        <button id="clearDbButton">Clear DB</button>
+    </div>
+</template>
+<template name="inactiveSettings">
+    <div id="settingsPanel">
         <div id="gravitySlider"><label for="gravitySlider">0.05</label></div>
         <br/>
         <div id="chargeSlider"><label for="chargeSlider">-200</label></div>
         <br/>
         <div id="strengthSlider"><label for="strengthSlider">0.1</label></div>
-        <br/>
-        <button id="clearDbButton">Clear DB</button>
         <br/>
     </div>
 </template>
