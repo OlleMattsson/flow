@@ -42,7 +42,7 @@ button:focus {
     top: 0px;
     left: 0px;
     width:200px;
-    height:50px;
+    height:110px;
     z-index: 100;
     border: 1px solid #3d3d3d;
     border-radius: 5px;
@@ -51,6 +51,7 @@ button:focus {
 }
 
 #settingsPanel label{
-    margin-top:10px;
-    font-size:12px;
+    margin-top: 18px;
+    font-size: 10px;
+    float: right;
 }

@@ -2,22 +2,15 @@ Messages = new Mongo.Collection("messages");
 
 Meteor.methods({
     newMessage: function (msg) {
-
         // check length of message 160 chars
-
-
         Messages.insert({
             message: msg,
             createdAt: new Date()
         });
-
         // publish message to subsribed clients
-
-
     },
 
     subsribe: function (channel) {
-
     },
     getMessages: function () {
         return Messages.find({}, {sort: {createdAt: -1}});
@@ -30,9 +23,19 @@ Meteor.methods({
 if (Meteor.isClient) {
     Session.setDefault("centerX", $(window).width() / 2);
     Session.setDefault("centerY", $(window).height() / 2);
-    //Session.setDefault("rootElement", null);
-    var rootElement = null;
-    var force = d3.layout.force();
+    window.force = d3.layout.force();
+    var force = window.force,
+        d3nodes = [],
+        d3links = [],
+        svg,
+        speed = 100, // link distance increment per second
+        linkMaxLength = 1000,
+        newLength,
+        now,
+        nodeAge,
+        initialLinkStrength = 0.5,
+        finalLinkStrength = 0.01,
+        newLinkStrength;
 
     Template.newMessage.events({
         "submit #newMessageForm": function (event) {
@@ -41,121 +44,54 @@ if (Meteor.isClient) {
             event.target[0].value = "";
             return false;
         },
-        "keyup #newMessageField": function(event) {
-            $("label[for='newMessageField'] span").html(160- $('#newMessageField').val().length) //
+        "keyup #newMessageField": function() {
+            $("label[for='newMessageField'] span").html(160- $('#newMessageField').val().length);
         }
     });
 
     Template.d3.rendered = function() {
-        var d3width = 960,
-            d3height = 500,
-            d3nodes = [],
-            d3links = [],
-            newMessageFieldHeight = 100;
-
-        var svg = d3.select("#d3").append("svg")
+        svg = d3.select("#d3").append("svg")
             .attr("width", $(window).width())
-            .attr("height",( $(window).height()));
-
-        var SVGnodes = svg.selectAll(".node"),
-            SVGlinks = svg.selectAll(".link");
+            .attr("height",( $(window).height())),
+            initialLinkStrength = 0.5;
 
         force = d3.layout.force()
             .nodes(d3nodes)
             .links(d3links)
             .gravity(0.05)
             .friction(0.9)
-            .charge(-1000)
-            .linkStrength(0.01)
-            .distance(function(d){
-                //var now = Math.floor(Date.now() / 1000),
-                //diff = now - d.source.timestamp;
-
-
-                //return diff * 1;
-                return 90;
-            })
-
+            .charge(-10)
+            .linkStrength(initialLinkStrength)
+            .distance(10)
             .size([$(window).width(), $(window).height()])
-            .on("tick", function() {
+            .on("tick", tick)
+            .start();
 
-                if(d3nodes.length > 0) {
-                    d3nodes[0].x = Session.get("centerX");
-                    d3nodes[0].y = Session.get("centerY");
-                }
-
-
-                force.stop().distance(function(d){
-
-                    var speed = 100; // increment per second
-                    var maxLength = 3000;
-                    var now = Math.floor(Date.now() / 1000),
-                        diff = now - d.source.timestamp;
-
-                    if (diff < 60) {
-                        newLength = (now - d.source.timestamp) * speed;
-                        if (newLength < maxLength ) {return newLength;}
-                        else {return maxLength;}
-                    } else {
-                        newLength = (now - d.source.timestamp) * speed/2;
-                    }
-
-
-
-                }).start()
-
-
-                // attract towards quadrants
-                var q = d3.geom.quadtree(d3nodes),
-                    i = 0,
-                    n = d3nodes.length;
-
-                while (++i < n) q.visit(collide(d3nodes[i]));
-
-                svg.selectAll(".link").attr("x1", function(d) { return d.source.x; })
-                                      .attr("y1", function(d) { return d.source.y; })
-                                      .attr("x2", function(d) { return d.target.x; })
-                                      .attr("y2", function(d) { return d.target.y; });
-
-                svg.selectAll(".node").attr("transform", function(d) { return "translate(" + d.x + "," + d.y + ")"; });
-            });
-
-
-        force.start();
 
         Messages.find().observeChanges({
-
             added: function(id, fields) {
-
-                force.stop();
-                d = new Date(fields.createdAt);
-                s = d.getSeconds();
-
-                var px, py;
-
-                if (s >= 0 && s < 15) {px = Session.get("centerX") + 50; py = Session.get("centerY") - 50;}
-                if (s > 15 && s < 30) {px = Session.get("centerX") + 50; py = Session.get("centerY") + 50;}
-                if (s > 30 && s < 45) {px = Session.get("centerX") - 50; py = Session.get("centerY") + 50;}
-                if (s > 45 && s <= 60){px = Session.get("centerX") - 50; py = Session.get("centerY") - 50;}
-
-
-                // determine radius
-                var defaultRadius = 30;
-
-                var radius = defaultRadius,
-                    l = fields.message.length;
+                var d = new Date(fields.createdAt),
+                    defaultRadius = 30,
+                    radius = defaultRadius,
+                    l = fields.message.length,
+                    newNode;
 
                 if ( l > 10) { radius = 30 + l / 1.5};
 
-                var newNode = {x: px, y: py, radius: radius, timestamp: Math.floor(d.getTime() / 1000)},
-                    n = d3nodes.push(newNode);
-                    l = d3links.push({source: newNode, target: 0});
+                if(d3nodes[0]) {
+                    newNode = {x: d3nodes[0].x, y: d3nodes[0].y, radius: radius, timestamp: d.getTime()};
+                } else {
+                    newNode = {x: Session.get("centerX"), y: Session.get("centerY"), radius: radius, timestamp: d.getTime()};
+                }
+
+                d3nodes.push(newNode);
+                d3links.push({source: newNode, target: 0});
 
                 var SVGlink = svg.selectAll(".link")
                     .data(d3links)
                     .enter().append("line")
                     .attr("class", "link")
-                    //.style({"stroke" : "#3d3d3d"});
+                //.style({"stroke" : "#3d3d3d"});
 
                 var SVGnode = svg.selectAll(".node")
                     .data(d3nodes)
@@ -165,12 +101,10 @@ if (Meteor.isClient) {
                 SVGnode.append("circle")
                     .attr("r", radius)
                     .style({"stroke": "#3d3d3d", "stroke-width" : 2, "fill": "#ffffff"})
-                    .call(force.drag);
 
                 SVGnode.append("text")
                     .attr("dx", "0")
                     .attr("dy", "0")
-                    //.attr("y", "50%")
                     .attr("text-anchor", "middle")
                     .text(fields.message);
 
@@ -180,43 +114,80 @@ if (Meteor.isClient) {
                 force.start();
             }
         });
+    };
 
 
-    }
 
-    Template.settings.rendered = function() {
-         $('#gravitySlider').slider({
-            min: 0,
-            max: 1,
-            step: 0.001,
-            value: 0.05,
-            slide: function( event, ui ) {
-                var newGravity = ui. value;
-                force.stop().charge(newGravity).start()
-                $("label[for='gravitySlider']").html(newGravity);
+    function tick() {
+        // these definition should be moved out of the tick function =) but it didn't work properly so....
 
-            }
-        });
-        $('#chargeSlider').slider({
-            min: 0,
-            max: 2000,
-            step: 100,
-            value: 1000,
-            slide: function( event, ui ) {
-                var newCharge = (- ui. value);
-                force.stop().charge(newCharge).start()
-                $("label[for='chargeSlider']").html(newCharge);
 
-            }
-        });
-    }
+        force.stop();
 
-    Template.settings.events({
-        "click #clearDbButton": function(event) {
-
-            Meteor.call("clearDb");
+        if(d3nodes.length > 0) {
+            d3nodes[0].x = Session.get("centerX");
+            d3nodes[0].y = Session.get("centerY");
         }
-    })
+
+        force.distance(function(d){
+            now = Date.now();
+            nodeAge = (now - d.source.timestamp) / 1000;
+
+            if (nodeAge < 30) {                                    // if message is less than this old
+                newLength = (nodeAge) * speed; // it will move away with this speed
+                if (newLength < linkMaxLength ) {return newLength;}
+                else {return linkMaxLength;}                        // until it reaches this treshhold
+            } else {
+                newLength = (nodeAge) * speed;
+                return newLength * 0.5;
+            }
+        })
+            .linkStrength(function(d){
+                now = Date.now();
+                nodeAge = (now - d.source.timestamp) /1000;
+                newLinkStrength = initialLinkStrength * (1/nodeAge) * 0.4;
+
+                if (newLinkStrength != Infinity) {
+                    if (newLinkStrength > finalLinkStrength ) {
+                        //console.log(""+nodeAge+","+newLinkStrength+"");
+                        return newLinkStrength;
+                    }
+                    else {
+                        //console.log("minimum reached");
+                        return finalLinkStrength;
+                    }                        // until it reaches this treshhold
+                }
+            })
+            .charge(function(d) {
+                now = Date.now();
+                nodeAge = (now - d.timestamp) /1000;
+                if (nodeAge > 1) {
+                    return -100;
+                } else {
+                    return -10;
+                }
+
+            })
+            .start();
+
+        var q = d3.geom.quadtree(d3nodes),
+            i = 0,
+            n = d3nodes.length;
+
+        while (++i < n ) {
+            now = Date.now();
+            nodeAge = (now - d3nodes[i].timestamp) /1000;
+            if(nodeAge > 3) {
+                q.visit(collide(d3nodes[i]));
+            }
+        }
+        svg.selectAll(".link").attr("x1", function(d) { return d.source.x; })
+            .attr("y1", function(d) { return d.source.y; })
+            .attr("x2", function(d) { return d.target.x; })
+            .attr("y2", function(d) { return d.target.y; });
+
+        svg.selectAll(".node").attr("transform", function(d) { return "translate(" + d.x + "," + d.y + ")"; });
+    }
 
     // collision detection helper (http://bl.ocks.org/mbostock/3231298)
     function collide(node) {
@@ -271,12 +242,17 @@ if (Meteor.isClient) {
         });
 
     }
+
+    // returns integer between -99 and 99
+    function getCustomRand(){
+        var random = Math.floor(Math.random()*99) - 45;
+        if(random==0) return getCustomRand();
+        return random;
+    }
 }
 
 if (Meteor.isServer) {
   Meteor.startup(function () {
-    // code to run on server at startup
-
       var msgCollection = Messages.find();
       if (msgCollection.count() == 0) {
           Meteor.call("newMessage", '#flow');
