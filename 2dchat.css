@@ -2,6 +2,7 @@ body, html {
     padding:0px;
     margin:0px;
     height:100%;
+    overflow:hidden;
 }
 
 input:focus,
@@ -49,7 +50,7 @@ button:focus {
 #settingsPanel {
     position:absolute;
     top: 0px;
-    left: 0px;
+    right: 0px;
     width:80px;
     height:30px;
     z-index: 100;
@@ -64,4 +65,10 @@ button:focus {
     margin-top: 18px;
     font-size: 10px;
     float: right;
+}
+
+#login-buttons {
+    position:absolute;
+    left:0px;
+    top:0px;
 }

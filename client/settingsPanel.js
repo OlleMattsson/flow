@@ -1,5 +1,5 @@
 if (Meteor.isClient) {
-    Template.settings.rendered = function() {
+    Template.inactiveSettings.rendered = function() {
         $('#gravitySlider').slider({
             min: 0,
             max: 0.2,
@@ -38,7 +38,7 @@ if (Meteor.isClient) {
         });
     };
 
-    Template.settings.events({
+    Template.admin.events({
         "click #clearDbButton": function() {
             force.stop()
             Meteor.call("clearDb", function(){
