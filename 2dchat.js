@@ -11,10 +11,10 @@ if (Meteor.isClient) {
         linkMaxLength = 1000,
         newLength,
         now,
-        nodeAge,
         initialLinkStrength = 0.1,
         finalLinkStrength = 0.01,
-        newLinkStrength;
+        newLinkStrength,
+        nodeAge;
 
 
 
@@ -53,20 +53,24 @@ if (Meteor.isClient) {
                 }
 
                 //console.log("" + Session.get("centerX") + ", " + Session.get("centerY") + "");
-//                console.log(newNode);
+                //console.log(newNode);
                 d3nodes.push(newNode);
                 d3links.push({source: newNode, target: 0});
 
+
+                /*
                 var SVGlink = svg.selectAll(".link")
                     .data(d3links)
                     .enter().append("line")
                     .attr("class", "link")
                     //.style({"stroke" : "#3d3d3d"});
+                */
 
                 var SVGnode = svg.selectAll(".node")
                     .data(d3nodes)
                     .enter().append("g")
-                    .attr("class", "node");
+                    .attr("class", "node")
+                    .attr("id", newNode.index);
 
                 SVGnode.append("circle")
                     .attr("r", radius)
@@ -86,12 +90,38 @@ if (Meteor.isClient) {
         });
     };
 
+    function getNodeAge(created){
+        var now = Date.now();
+        return ((now - created) / 1000);
+    }
+
     function tick() {
         force.stop();
+
 
         if(d3nodes.length > 0) {
             d3nodes[0].x = Session.get("centerX");
             d3nodes[0].y = Session.get("centerY");
+        }
+
+
+
+        var q = d3.geom.quadtree(d3nodes),
+            i = 0,
+            l = d3nodes.length;
+
+        while (++i < l ) {
+            if(d3nodes[i]) {
+                nodeAge = getNodeAge(d3nodes[i].nodeCreated);
+                if(nodeAge > 3) {
+                    q.visit(collide(d3nodes[i]));
+                }
+
+                if (nodeAge > 5) {
+                    //d3nodes.splice(1, 1)
+                    //l = d3nodes.length;
+                }
+            }
         }
 
 
@@ -122,30 +152,16 @@ if (Meteor.isClient) {
              now = Date.now();
              nodeAge = (now - d.source.nodeCreated) /1000;
              newLinkStrength = initialLinkStrength * (1/nodeAge) * 0.4;
-
              if (newLinkStrength != Infinity) {
                  if (newLinkStrength > finalLinkStrength ) {
-                     //console.log(""+nodeAge+","+newLinkStrength+"");
                      return newLinkStrength;
                  } else {
-                     //console.log("minimum reached");
                      return finalLinkStrength;
-                 }                        // until it reaches this treshhold
+                 }
              }
          })
             .start();
 
-        var q = d3.geom.quadtree(d3nodes),
-            i = 0,
-            n = d3nodes.length;
-
-        while (++i < n ) {
-            now = Date.now();
-            nodeAge = (now - d3nodes[i].nodeCreated) / 1000;
-            if(nodeAge > 3) {
-                q.visit(collide(d3nodes[i]));
-            }
-        }
         svg.selectAll(".link").attr("x1", function(d) { return d.source.x; })
             .attr("y1", function(d) { return d.source.y; })
             .attr("x2", function(d) { return d.target.x; })
