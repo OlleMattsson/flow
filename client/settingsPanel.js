@@ -42,7 +42,7 @@ if (Meteor.isClient) {
         "click #clearDbButton": function() {
             force.stop()
             Meteor.call("clearDb", function(){
-                Meteor.call("newMessage", '#flow');
+
             });
 
         }

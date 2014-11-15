@@ -16,28 +16,7 @@ if (Meteor.isClient) {
         finalLinkStrength = 0.01,
         newLinkStrength;
 
-    Template.newMessage.events({
-        "submit #newMessageForm": function (event) {
-            var msg = event.target[0].value;
 
-            Meteor.call("newMessage", msg, function(err, r) {
-                if (err) {
-                    console.log(err.reason); // handle error responses in UI
-                }
-            });
-
-            event.target[0].value = "";
-            return false;
-        },
-
-        "keyup #newMessageField": function() {
-            var $newMessageField = $('#newMessageField'),
-                msgLength = $newMessageField.val().length,
-                maxchars = 140;
-            $newMessageField.val($newMessageField.val().substring(0, maxchars)); //remove exceeding characters
-            $("label[for='newMessageField'] span").html(maxchars - msgLength);
-        }
-    });
 
     Template.d3.rendered = function() {
         svg = d3.select("#d3").append("svg")
@@ -59,6 +38,7 @@ if (Meteor.isClient) {
 
         Messages.find().observeChanges({
             added: function(id, fields) {
+                force.stop();
                 var d = new Date(fields.createdAt),
                     defaultRadius = 30,
                     radius = defaultRadius,
@@ -66,13 +46,14 @@ if (Meteor.isClient) {
                     newNode;
 
                 if ( l > 10) { radius = 30 + l / 1.5};
-
-                if(d3nodes[0]) {
-                    newNode = {x: d3nodes[0].x, y: d3nodes[0].y, radius: radius, timestamp: d.getTime()};
+                if(d3nodes.length == 0) {
+                    newNode = {x: Session.get("centerX"), y: Session.get("centerX"), radius: radius, nodeCreated: Date.now(), messageCreated: new Date(fields.messageCreated)};
                 } else {
-                    newNode = {x: Session.get("centerX"), y: Session.get("centerY"), radius: radius, timestamp: d.getTime()};
+                    newNode = {x: d3nodes[0].x, y: d3nodes[0].y, radius: radius, nodeCreated: Date.now(), messageCreated: new Date(fields.messageCreated)};
                 }
 
+                //console.log("" + Session.get("centerX") + ", " + Session.get("centerY") + "");
+//                console.log(newNode);
                 d3nodes.push(newNode);
                 d3links.push({source: newNode, target: 0});
 
@@ -80,7 +61,7 @@ if (Meteor.isClient) {
                     .data(d3links)
                     .enter().append("line")
                     .attr("class", "link")
-                //.style({"stroke" : "#3d3d3d"});
+                    //.style({"stroke" : "#3d3d3d"});
 
                 var SVGnode = svg.selectAll(".node")
                     .data(d3nodes)
@@ -106,18 +87,18 @@ if (Meteor.isClient) {
     };
 
     function tick() {
-         force.stop();
+        force.stop();
 
         if(d3nodes.length > 0) {
             d3nodes[0].x = Session.get("centerX");
             d3nodes[0].y = Session.get("centerY");
         }
 
+
         force.distance(function(d){
             now = Date.now();
-            nodeAge = (now - d.source.timestamp) / 1000;
-
-            if (nodeAge < 30) {                                    // if message is less than this old
+            nodeAge = (now - d.source.nodeCreated) / 1000;
+            if (nodeAge < 30 && nodeAge > 1) {                                    // if message is less than this old
                 newLength = (nodeAge) * speed; // it will move away with this speed
                 if (newLength < linkMaxLength ) {return newLength;}
                 else {return linkMaxLength;}                        // until it reaches this treshhold
@@ -126,34 +107,32 @@ if (Meteor.isClient) {
                 return newLength;
             }
         })
-           /*
-            .linkStrength(function(d){
-                now = Date.now();
-                nodeAge = (now - d.source.timestamp) /1000;
-                newLinkStrength = initialLinkStrength * (1/nodeAge) * 0.4;
+        .charge(function(d) {
+            now = Date.now();
+            nodeAge = (now - d.nodeCreated) /1000;
 
-                if (newLinkStrength != Infinity) {
-                    if (newLinkStrength > finalLinkStrength ) {
-                        //console.log(""+nodeAge+","+newLinkStrength+"");
-                        return newLinkStrength;
-                    }
-                    else {
-                        //console.log("minimum reached");
-                        return finalLinkStrength;
-                    }                        // until it reaches this treshhold
-                }
-            })
-            */
-            .charge(function(d) {
-                now = Date.now();
-                nodeAge = (now - d.timestamp) /1000;
-                if (nodeAge > 1) {
-                    return -100;
-                } else {
-                    return -10;
-                }
+        if (nodeAge > 1) {
+                return -100;
+            } else {
+                return -10;
+            }
 
-            })
+        })
+        .linkStrength(function(d){
+             now = Date.now();
+             nodeAge = (now - d.source.nodeCreated) /1000;
+             newLinkStrength = initialLinkStrength * (1/nodeAge) * 0.4;
+
+             if (newLinkStrength != Infinity) {
+                 if (newLinkStrength > finalLinkStrength ) {
+                     //console.log(""+nodeAge+","+newLinkStrength+"");
+                     return newLinkStrength;
+                 } else {
+                     //console.log("minimum reached");
+                     return finalLinkStrength;
+                 }                        // until it reaches this treshhold
+             }
+         })
             .start();
 
         var q = d3.geom.quadtree(d3nodes),
@@ -162,7 +141,7 @@ if (Meteor.isClient) {
 
         while (++i < n ) {
             now = Date.now();
-            nodeAge = (now - d3nodes[i].timestamp) /1000;
+            nodeAge = (now - d3nodes[i].nodeCreated) / 1000;
             if(nodeAge > 3) {
                 q.visit(collide(d3nodes[i]));
             }
@@ -174,6 +153,29 @@ if (Meteor.isClient) {
 
         svg.selectAll(".node").attr("transform", function(d) { return "translate(" + d.x + "," + d.y + ")"; });
     }
+
+    Template.newMessage.events({
+        "submit #newMessageForm": function (event) {
+            var msg = event.target[0].value;
+
+            Meteor.call("newMessage", msg, function(err, r) {
+                if (err) {
+                    console.log(err.reason); // handle error responses in UI
+                }
+            });
+
+            event.target[0].value = "";
+            return false;
+        },
+
+        "keyup #newMessageField": function() {
+            var $newMessageField = $('#newMessageField'),
+                msgLength = $newMessageField.val().length,
+                maxchars = 140;
+            $newMessageField.val($newMessageField.val().substring(0, maxchars)); //remove exceeding characters
+            $("label[for='newMessageField'] span").html(maxchars - msgLength);
+        }
+    });
 
     Accounts.ui.config({
         passwordSignupFields: "USERNAME_ONLY"
@@ -196,9 +198,12 @@ if (Meteor.isServer) {
     });
     Meteor.startup(function () {
         var msgCollection = Messages.find();
+
         if (msgCollection.count() == 0) {
+          console.log("Collection empty, added root")
           Meteor.call("newMessage", '#flow');
         }
+
     });
 
 }
