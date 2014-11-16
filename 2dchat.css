@@ -3,6 +3,13 @@ body, html {
     margin:0px;
     height:100%;
     overflow:hidden;
+    font-family: 'Ubuntu', sans-serif;
+
+}
+
+body {
+    background-image: radial-gradient(transparent, rgba(0,0,0,.5)), url(/lightbluenosie1.png);
+    min-height:100%;
 }
 
 input:focus,
@@ -79,4 +86,5 @@ button:focus {
 .msg{
     position:absolute;
     display:block;
+    text-align: center;
 }

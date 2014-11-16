@@ -20,7 +20,7 @@ if (Meteor.isClient) {
         // scaling nodes
         defaultNodeRadius = 30,
         nodeScalingMessageLengthThreshold = 10,
-        nodeScalingFactor = 1.5,
+        nodeScalingFactor = 0.9,
 
         // d3.force
         gravity = 0.05,
@@ -37,7 +37,8 @@ if (Meteor.isClient) {
 
         messageMaxAge = 60,         // (seconds) time how long messages are display
         collissionTimeout = 3,      // (seconds) wait until collission detection is applied
-        loadOldMessagesAge = 30     // /seconds) how old messages to load when app loads
+        loadOldMessagesAge = 30,     // /seconds) how old messages to load when app loads
+        rootNodeName = "#Flow"
         ;
 
 
@@ -50,7 +51,26 @@ if (Meteor.isClient) {
             .attr("width", $(window).width())
             .attr("height",( $(window).height()));
         linkGroup = svg.append("g").attr("id", "linkGroup"),
-        nodeGroup = svg.append("g").attr("id", "nodeGroup"),
+        nodeGroup = svg.append("g").attr("id", "nodeGroup");
+
+        var gradient = svg.append("svg:defs")
+            .append("svg:linearGradient")
+            .attr("id", "gradient")
+            .attr("x1", "50%")
+            .attr("y1", "0%")
+            .attr("x2", "50%")
+            .attr("y2", "100%")
+            .attr("spreadMethod", "pad");
+
+        gradient.append("svg:stop")
+            .attr("offset", "60%")
+            .attr("stop-color", "#ffffff")
+            .attr("stop-opacity", 1);
+
+        gradient.append("svg:stop")
+            .attr("offset", "100%")
+            .attr("stop-color", "#c2c2c2")
+            .attr("stop-opacity", 1);
 
         // start d3
         force = d3.layout.force()
@@ -65,10 +85,9 @@ if (Meteor.isClient) {
             .start();
 
         // place root node in the center of the screen
-        d3nodes.push( {x: Session.get("centerX"), y: Session.get("centerX"), radius: 30, nodeCreated: Date.now(),  message: "#Flow"});
+        d3nodes.push( {x: Session.get("centerX"), y: Session.get("centerX"), radius: 30, nodeCreated: Date.now(),  message: rootNodeName});
         update();
     };
-
 
 
 
@@ -82,9 +101,9 @@ if (Meteor.isClient) {
                     l = fields.message.length,
                     newNode;
 
-                // calculate radius based on message length
+                // calculate node radius based on message length
                 if (l > nodeScalingMessageLengthThreshold) {
-                    radius = defaultNodeRadius + l / nodeScalingFactor
+                    radius = defaultNodeRadius + l * nodeScalingFactor
                 }
 
                 newNode = {x: d3nodes[0].x, y: d3nodes[0].y, radius: radius, nodeCreated: Date.now(), messageCreated: new Date(fields.messageCreated), message: fields.message};
@@ -97,55 +116,56 @@ if (Meteor.isClient) {
     });
 
 
-
-
+    // update DOM
     function update(){
         // links //
-        var SVGlinks = linkGroup.selectAll(".link").data(d3links);
+        var SVGlinks = linkGroup.selectAll(".link").data(force.links()); // , function(d) { return d.source.id + "-" + d.target.id; }
+
+        //link = link.data(force.links(), function(d) { return d.source.id + "-" + d.target.id; });
 
             SVGlinks.enter()
                 .insert("line")
                 .attr("class", "link")
-                .style({"stroke" : "#3d3d3d"}); // uncomment for lines
+                //.style({"stroke" : "#3d3d3d"}); // uncomment for lines
 
             SVGlinks.exit().remove();
 
 
-
         // nodes //
         var SVGnodes = nodeGroup.selectAll(".node").data(force.nodes());
-
         // update
         var circleSelection = d3.selectAll("circle").data(force.nodes())
             circleSelection.attr("r", function (d, i){ return d.radius})
-
         // new
         var groupEnter = SVGnodes.enter()
                 .append("g")
                 .attr("class", "node")
             groupEnter.append("circle")
-                .attr("r", function (d){return d.radius})
-                .style({"stroke": "#a3a3a3", "stroke-width" : 2, "fill": "#ffffff"});
+                .attr("r", function (d){return d.radius })
+                .style({"stroke": "#949494", "stroke-width" : 1})
+                .attr('fill', 'url(#gradient)');;
         // remove
         SVGnodes.exit().remove();
 
 
         // text //
         var textSelection = textGroup.selectAll(".msg").data(force.nodes());
-        textSelection // update
+        // update
+        textSelection
             .html(function (d){return d.message})
             .style("width", function (d){return d.radius * 2 +"px"});
+        // enter
         textSelection.enter()
             .append("div")
             .attr("class", "msg")
-            .style("width", function (d){return d.radius * 2 +"px"})
+            .style({"width" :  function (d){return d.radius * 2 +"px"} })
             .html(function (d){ return  d.message});
+        // remove
         textSelection.exit().remove();
     }
 
 
-
-
+    // d3.force tick
     function tick() {
         var q = d3.geom.quadtree(d3nodes),
             i = 0,
@@ -171,7 +191,7 @@ if (Meteor.isClient) {
                 // remove old nodes
                 if (age > messageMaxAge) {
                     d3nodes.splice(i, 1);
-                    d3links.splice(i, 1);
+                    d3links.splice(i-1, 1);
                     update();
                 }
             }
@@ -213,7 +233,8 @@ if (Meteor.isClient) {
             })
             .start();
 
-        svg.selectAll(".link").attr("x1", function(d) { return d.source.x; })
+        svg.selectAll(".link")
+            .attr("x1", function(d) { return d.source.x; })
             .attr("y1", function(d) { return d.source.y; })
             .attr("x2", function(d) { return d.target.x; })
             .attr("y2", function(d) { return d.target.y; });
@@ -224,7 +245,12 @@ if (Meteor.isClient) {
 
         d3.selectAll(".msg")
             .style("left", function(d) { return d.x + "px"; })
-            .style("top", function(d) { return d.y + "px"; });
+            .style("top", function(d) { return d.y + "px"; })
+            .style({ "margin-left" : function(d) { return -(d.radius) + "px"},
+                     "margin-top" : function(d) { return (parseInt( $(this).css("height") ) / -2) +"px"}
+
+            });
+
     }
 
 
@@ -245,7 +271,7 @@ if (Meteor.isClient) {
 
         "click #removeOldest": function() {
             d3nodes.splice(1, 1);
-            d3links.splice(1, 1);
+            d3links.splice(0, 1);
             update();
         },
 
@@ -309,6 +335,8 @@ if (Meteor.isClient) {
         Session.set("centerY", $(window).height() / 2);
         force.size([$(window).width(), $(window).height()])
     });
+
+
 
 
 
