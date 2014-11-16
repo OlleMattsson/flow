@@ -33,7 +33,12 @@ if (Meteor.isClient) {
         speed = 100,                // Speed at which nodes move away from the root
         linkMaxLength = 1000,       // Threshhold distance for new nodes
         newLength,
-        newLinkStrength;
+        newLinkStrength,
+
+        messageMaxAge = 60,         // (seconds) time how long messages are display
+        collissionTimeout = 3,      // (seconds) wait until collission detection is applied
+        loadOldMessagesAge = 30     // /seconds) how old messages to load when app loads
+        ;
 
 
 
@@ -58,6 +63,10 @@ if (Meteor.isClient) {
             .size([$(window).width(), $(window).height()])
             .on("tick", tick)
             .start();
+
+        // place root node in the center of the screen
+        d3nodes.push( {x: Session.get("centerX"), y: Session.get("centerX"), radius: 30, nodeCreated: Date.now(),  message: "#Flow"});
+        update();
     };
 
 
@@ -66,23 +75,24 @@ if (Meteor.isClient) {
     // handle new messages
     Messages.find().observeChanges({
         added: function(id, fields) {
-            var radius = defaultNodeRadius,
-                l = fields.message.length,
-                newNode;
+           age = nodeAge(fields.messageCreated);
 
-            // calculate radius based on message length
-            if ( l > nodeScalingMessageLengthThreshold) { radius = defaultNodeRadius + l / nodeScalingFactor};
+            if (age < loadOldMessagesAge) {
+                var radius = defaultNodeRadius,
+                    l = fields.message.length,
+                    newNode;
 
-            if(d3nodes.length == 0) {
-                // place root node in the center of the screen
-                newNode = {x: Session.get("centerX"), y: Session.get("centerX"), radius: radius, nodeCreated: Date.now(), messageCreated: new Date(fields.messageCreated), message: fields.message};
-            } else {
+                // calculate radius based on message length
+                if (l > nodeScalingMessageLengthThreshold) {
+                    radius = defaultNodeRadius + l / nodeScalingFactor
+                }
+
                 newNode = {x: d3nodes[0].x, y: d3nodes[0].y, radius: radius, nodeCreated: Date.now(), messageCreated: new Date(fields.messageCreated), message: fields.message};
-            }
 
-            d3nodes.push(newNode);
-            d3links.push({source: newNode, target: 0});
-            update()
+                d3nodes.push(newNode);
+                d3links.push({source: newNode, target: 0});
+                update();
+            }
         }
     });
 
@@ -155,11 +165,11 @@ if (Meteor.isClient) {
             if(d3nodes[i]) {
                 age = nodeAge(d3nodes[i].nodeCreated);
                 // apply collission
-                if(age > 3) {
+                if(age > collissionTimeout) {
                     q.visit(collide(d3nodes[i]));
                 }
                 // remove old nodes
-                if (age > 6000) {
+                if (age > messageMaxAge) {
                     d3nodes.splice(i, 1);
                     d3links.splice(i, 1);
                     update();
