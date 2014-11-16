@@ -35,6 +35,9 @@ if (Meteor.isClient) {
         newLength,
         newLinkStrength;
 
+
+
+
     // Wait for the DOM to finish and start d3
     Template.d3.rendered = function() {
         textGroup = d3.select("#d3").append("div").attr("id", "textGroup");
@@ -56,6 +59,9 @@ if (Meteor.isClient) {
             .on("tick", tick)
             .start();
     };
+
+
+
 
     // handle new messages
     Messages.find().observeChanges({
@@ -81,45 +87,54 @@ if (Meteor.isClient) {
     });
 
 
-    function update(){
-        // links
-        var SVGlinks = linkGroup.selectAll(".link")
-            .data(d3links);
 
-             SVGlinks.enter()
+
+    function update(){
+        // links //
+        var SVGlinks = linkGroup.selectAll(".link").data(d3links);
+
+            SVGlinks.enter()
                 .insert("line")
                 .attr("class", "link")
-                //.style({"stroke" : "#3d3d3d"}); // uncomment for lines
+                .style({"stroke" : "#3d3d3d"}); // uncomment for lines
 
             SVGlinks.exit().remove();
 
-        // nodes
-        var SVGnodes = nodeGroup.selectAll(".node")
-                .data(d3nodes);
 
-            SVGnodes.exit().remove();
 
-        var group = SVGnodes.enter().append("g")
+        // nodes //
+        var SVGnodes = nodeGroup.selectAll(".node").data(force.nodes());
+
+        // update
+        var circleSelection = d3.selectAll("circle").data(force.nodes())
+            circleSelection.attr("r", function (d, i){ return d.radius})
+
+        // new
+        var groupEnter = SVGnodes.enter()
+                .append("g")
                 .attr("class", "node")
-                .attr("index", function (d){return d.index});
-            group.append("circle")
+            groupEnter.append("circle")
                 .attr("r", function (d){return d.radius})
                 .style({"stroke": "#a3a3a3", "stroke-width" : 2, "fill": "#ffffff"});
+        // remove
+        SVGnodes.exit().remove();
 
-        // text
+
+        // text //
         var textSelection = textGroup.selectAll(".msg").data(force.nodes());
-
-        textSelection
+        textSelection // update
             .html(function (d){return d.message})
-
+            .style("width", function (d){return d.radius * 2 +"px"});
         textSelection.enter()
             .append("div")
             .attr("class", "msg")
-            .style("width", function (d){ return d.radius * 2 +"px"})
-            .html(function (d){ return  d.message})
-
+            .style("width", function (d){return d.radius * 2 +"px"})
+            .html(function (d){ return  d.message});
         textSelection.exit().remove();
     }
+
+
+
 
     function tick() {
         var q = d3.geom.quadtree(d3nodes),
@@ -135,6 +150,7 @@ if (Meteor.isClient) {
             d3nodes[0].nodeCreated = Date.now();
         }
 
+        // apply collissions and remove old
         while (++i < l ) {
             if(d3nodes[i]) {
                 age = nodeAge(d3nodes[i].nodeCreated);
@@ -143,7 +159,7 @@ if (Meteor.isClient) {
                     q.visit(collide(d3nodes[i]));
                 }
                 // remove old nodes
-                if (age > 60) {
+                if (age > 6000) {
                     d3nodes.splice(i, 1);
                     d3links.splice(i, 1);
                     update();
@@ -201,10 +217,16 @@ if (Meteor.isClient) {
             .style("top", function(d) { return d.y + "px"; });
     }
 
+
+
+
     function nodeAge(created){
         var now = Date.now();
         return ((now - created) / 1000);
     }
+
+
+
 
     Template.admin.events({
         "click #clearDbButton": function() {
@@ -226,6 +248,9 @@ if (Meteor.isClient) {
             update();
         }
     });
+
+
+
 
     Template.newMessage.events({
 
@@ -251,21 +276,37 @@ if (Meteor.isClient) {
         }
     });
 
+
+
+
     Accounts.ui.config({
         passwordSignupFields: "USERNAME_ONLY"
 
     });
 
+
+
+
     Accounts.config({
         forbidClientAccountCreation: true
     });
+
+
+
 
     $(window).on("resize", function(){
         Session.set("centerX", $(window).width() / 2);
         Session.set("centerY", $(window).height() / 2);
         force.size([$(window).width(), $(window).height()])
     });
+
+
+
 }
+
+
+
+
 
 if (Meteor.isServer) {
 
