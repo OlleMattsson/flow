@@ -1,100 +1,99 @@
 if (Meteor.isClient) {
+
     Meteor.subscribe("messages");
+
     Session.setDefault("centerX", $(window).width() / 2);
     Session.setDefault("centerY", $(window).height() / 2);
+
     window.force = d3.layout.force();
+
     var force = window.force,
         d3nodes = [],
         d3links = [],
         svg,
-        speed = 100, // link distance increment per second
-        linkMaxLength = 1000,
-        newLength,
         now,
-        initialLinkStrength = 0.1,
-        finalLinkStrength = 0.01,
-        newLinkStrength,
-        nodeAge,
+        age,
         textGroup,
         nodeGroup,
-        linkGroup;
+        linkGroup,
 
+        // scaling nodes
+        defaultNodeRadius = 30,
+        nodeScalingMessageLengthThreshold = 10,
+        nodeScalingFactor = 1.5,
 
+        // d3.force
+        gravity = 0.05,
+        initialCharge = -10,
+        charge = -100,
+        chargeTimer = 1,
+        distance = 50,              // initial distance from root to node
+        initialLinkStrength = 0.1,  // Link strength for newly placed nodes need to be high to prevent bouncing and twitching
+        finalLinkStrength = 0.01,   // As the node gets older it's link strength decreases
+        speed = 100,                // Speed at which nodes move away from the root
+        linkMaxLength = 1000,       // Threshhold distance for new nodes
+        newLength,
+        newLinkStrength;
 
+    // Wait for the DOM to finish and start d3
     Template.d3.rendered = function() {
+        textGroup = d3.select("#d3").append("div").attr("id", "textGroup");
         svg = d3.select("#d3").append("svg")
             .attr("width", $(window).width())
             .attr("height",( $(window).height()));
-
         linkGroup = svg.append("g").attr("id", "linkGroup"),
         nodeGroup = svg.append("g").attr("id", "nodeGroup"),
-        textGroup = svg.append("g").attr("id", "textGroup");
 
+        // start d3
         force = d3.layout.force()
             .nodes(d3nodes)
             .links(d3links)
-            .gravity(0.05)
-            .friction(0.9)
-            .charge(-10)
+            .gravity(gravity)
+            .charge(initialCharge)
             .linkStrength(finalLinkStrength)
-            .distance(50)
+            .distance(distance)
             .size([$(window).width(), $(window).height()])
             .on("tick", tick)
             .start();
-
-
-        Messages.find().observeChanges({
-            added: function(id, fields) {
-
-
-
-                var d = new Date(fields.createdAt),
-                    defaultRadius = 30,
-                    radius = defaultRadius,
-                    l = fields.message.length,
-                    newNode;
-
-                if ( l > 10) { radius = 30 + l / 1.5};
-
-                if(d3nodes.length == 0) {
-                    newNode = {x: Session.get("centerX"), y: Session.get("centerX"), radius: radius, nodeCreated: Date.now(), messageCreated: new Date(fields.messageCreated), message: fields.message};
-                } else {
-                    newNode = {x: d3nodes[0].x, y: d3nodes[0].y, radius: radius, nodeCreated: Date.now(), messageCreated: new Date(fields.messageCreated), message: fields.message};
-                }
-
-                //console.log("" + Session.get("centerX") + ", " + Session.get("centerY") + "");
-                //console.log(newNode);
-                d3nodes.push(newNode);
-
-                //console.log(d3nodes);
-                d3links.push({source: newNode, target: 0});
-
-                update()
-
-
-            }
-        });
     };
 
-    function getNodeAge(created){
-        var now = Date.now();
-        return ((now - created) / 1000);
-    }
+    // handle new messages
+    Messages.find().observeChanges({
+        added: function(id, fields) {
+            var radius = defaultNodeRadius,
+                l = fields.message.length,
+                newNode;
+
+            // calculate radius based on message length
+            if ( l > nodeScalingMessageLengthThreshold) { radius = defaultNodeRadius + l / nodeScalingFactor};
+
+            if(d3nodes.length == 0) {
+                // place root node in the center of the screen
+                newNode = {x: Session.get("centerX"), y: Session.get("centerX"), radius: radius, nodeCreated: Date.now(), messageCreated: new Date(fields.messageCreated), message: fields.message};
+            } else {
+                newNode = {x: d3nodes[0].x, y: d3nodes[0].y, radius: radius, nodeCreated: Date.now(), messageCreated: new Date(fields.messageCreated), message: fields.message};
+            }
+
+            d3nodes.push(newNode);
+            d3links.push({source: newNode, target: 0});
+            update()
+        }
+    });
+
 
     function update(){
-        console.log('update');
-
+        // links
         var SVGlinks = linkGroup.selectAll(".link")
             .data(d3links);
 
              SVGlinks.enter()
                 .insert("line")
                 .attr("class", "link")
-                //.style({"stroke" : "#3d3d3d"});
+                //.style({"stroke" : "#3d3d3d"}); // uncomment for lines
 
             SVGlinks.exit().remove();
 
-
+        // nodes
         var SVGnodes = nodeGroup.selectAll(".node")
                 .data(d3nodes);
 
@@ -104,32 +103,23 @@ if (Meteor.isClient) {
                 .attr("class", "node")
                 .attr("index", function (d){return d.index});
             group.append("circle")
-                .attr("r", function (d){console.log(d); return d.radius})
+                .attr("r", function (d){return d.radius})
                 .style({"stroke": "#a3a3a3", "stroke-width" : 2, "fill": "#ffffff"});
 
-
-
-
+        // text
         var textSelection = textGroup.selectAll(".msg").data(force.nodes());
 
         textSelection
-            .text(function (d){return d.message})
-            .call(wrap, function (d){return d.radius} );
+            .html(function (d){return d.message})
 
         textSelection.enter()
-            .append("text")
-            .attr("id", function (d){ return d.index})
+            .append("div")
             .attr("class", "msg")
-            .attr("dx", "0")
-            .attr("dy", "0")
-            .text(function (d){ return  d.message})
-            .call(wrap, function (d){return d.radius} );;
+            .style("width", function (d){ return d.radius * 2 +"px"})
+            .html(function (d){ return  d.message})
 
         textSelection.exit().remove();
-
-
     }
-
 
     function tick() {
         var q = d3.geom.quadtree(d3nodes),
@@ -138,6 +128,7 @@ if (Meteor.isClient) {
 
         force.stop();
 
+        // root node zen
         if(d3nodes.length > 0) {
             d3nodes[0].x = Session.get("centerX");
             d3nodes[0].y = Session.get("centerY");
@@ -146,11 +137,13 @@ if (Meteor.isClient) {
 
         while (++i < l ) {
             if(d3nodes[i]) {
-                nodeAge = getNodeAge(d3nodes[i].nodeCreated);
-                if(nodeAge > 3) {
+                age = nodeAge(d3nodes[i].nodeCreated);
+                // apply collission
+                if(age > 3) {
                     q.visit(collide(d3nodes[i]));
                 }
-                if (nodeAge > 60) {
+                // remove old nodes
+                if (age > 60) {
                     d3nodes.splice(i, 1);
                     d3links.splice(i, 1);
                     update();
@@ -158,33 +151,32 @@ if (Meteor.isClient) {
             }
         }
 
-        force.distance(function(d){
+        force
+            .distance(function(d){
             now = Date.now();
-            nodeAge = (now - d.source.nodeCreated) / 1000;
-            if (nodeAge < 30 && nodeAge > 1) {                                    // if message is less than this old
-                newLength = (nodeAge) * speed; // it will move away with this speed
+            age = nodeAge(d.source.nodeCreated);
+            if (age < 30 && age > 1) {                                    // if message is less than this old
+                newLength = (age) * speed; // it will move away with this speed
                 if (newLength < linkMaxLength ) {return newLength;}
                 else {return linkMaxLength;}                        // until it reaches this treshhold
             } else {
-                newLength = (nodeAge) * speed * 0.7;
+                newLength = (age) * speed * 0.7;
                 return newLength;
             }
-        })
+            })
             .charge(function(d) {
-                now = Date.now();
-                nodeAge = (now - d.nodeCreated) /1000;
+                age = nodeAge(d.nodeCreated);
 
-                if (nodeAge > 1) {
-                    return -100;
+                if (age > chargeTimer) {
+                    return charge;
                 } else {
-                    return -10;
+                    return initialCharge;
                 }
 
             })
             .linkStrength(function(d){
-                now = Date.now();
-                nodeAge = (now - d.source.nodeCreated) /1000;
-                newLinkStrength = initialLinkStrength * (1/nodeAge) * 0.4;
+                age = nodeAge( d.source.nodeCreated);
+                newLinkStrength = initialLinkStrength * (1/age) * 0.4;
                 if (newLinkStrength != Infinity) {
                     if (newLinkStrength > finalLinkStrength ) {
                         return newLinkStrength;
@@ -203,76 +195,53 @@ if (Meteor.isClient) {
         svg.selectAll(".node")
             .attr("transform", function(d) { return "translate(" + d.x + "," + d.y + ")"; })
 
-        svg.selectAll(".msg")
-            .attr("transform", function(d) { return "translate(" + d.x + "," + d.y + ")"; })
 
-        //console.log($(d3nodes));
-        // throw Error("derp");
+        d3.selectAll(".msg")
+            .style("left", function(d) { return d.x + "px"; })
+            .style("top", function(d) { return d.y + "px"; });
+    }
 
-       /*
-       svg.selectAll(".node")
-            .data(d3nodes).exit().remove();
-
-        selection = d3.selectAll("text").data(d3nodes, function(d){return d.message})
-            .text(function(d){return d.message});
-
-        */
-
-
-
-
-
-
-        //.selectAll("text").call(wrap, function(d){return d.radius} );
-
-        //console.log($(text))
-
-        //throw Error("derp");
-
-
-
+    function nodeAge(created){
+        var now = Date.now();
+        return ((now - created) / 1000);
     }
 
     Template.admin.events({
         "click #clearDbButton": function() {
-            force.stop()
-            Meteor.call("clearDb", function(){
-
-            });
-
+            Meteor.call("clearDb");
         },
-        "click #removeOldest": function() {
 
+        "click #removeOldest": function() {
             d3nodes.splice(1, 1);
             d3links.splice(1, 1);
             update();
-            //throw Error("derp");
-
         },
+
         "click #logData": function() {
             console.log(d3nodes);
             console.log(d3links);
-        }
-        ,
+        },
+
         "click #update": function() {
             update();
         }
-    })
+    });
 
     Template.newMessage.events({
+
+        // Send message
         "submit #newMessageForm": function (event) {
             var msg = event.target[0].value;
-
             Meteor.call("newMessage", msg, function(err, r) {
                 if (err) {
-                    console.log(err.reason); // handle error responses in UI
+                    console.log(err.reason); // TODO: handle error responses in UI
                 }
             });
-
             event.target[0].value = "";
             return false;
         },
 
+        // Remaining characters
         "keyup #newMessageField": function() {
             var $newMessageField = $('#newMessageField'),
                 msgLength = $newMessageField.val().length,
@@ -294,17 +263,14 @@ if (Meteor.isClient) {
 
 if (Meteor.isServer) {
 
-    //process.env.METEOR_OFFLINE_CATALOG = 1;
-
-
     Accounts.config({
         forbidClientAccountCreation: true
     });
 
     Meteor.publish("messages", function () {
         return Messages.find();
-
     });
+
     Meteor.startup(function () {
         var msgCollection = Messages.find();
 
@@ -314,8 +280,4 @@ if (Meteor.isServer) {
         }
 
     });
-
 }
-
-// 160 chars:
-// You think water moves fast? You should see ice. It moves like it has a mind. Like it knows it killed the world once and got a taste for murder. After the avala

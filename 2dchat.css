@@ -72,3 +72,8 @@ button:focus {
     left:0px;
     top:0px;
 }
+
+.msg{
+    position:absolute;
+    display:block;
+}
