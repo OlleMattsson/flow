@@ -14,7 +14,10 @@ if (Meteor.isClient) {
         initialLinkStrength = 0.1,
         finalLinkStrength = 0.01,
         newLinkStrength,
-        nodeAge;
+        nodeAge,
+        textGroup,
+        nodeGroup,
+        linkGroup;
 
 
 
@@ -22,6 +25,10 @@ if (Meteor.isClient) {
         svg = d3.select("#d3").append("svg")
             .attr("width", $(window).width())
             .attr("height",( $(window).height()));
+
+        linkGroup = svg.append("g").attr("id", "linkGroup"),
+        nodeGroup = svg.append("g").attr("id", "nodeGroup"),
+        textGroup = svg.append("g").attr("id", "textGroup");
 
         force = d3.layout.force()
             .nodes(d3nodes)
@@ -38,7 +45,9 @@ if (Meteor.isClient) {
 
         Messages.find().observeChanges({
             added: function(id, fields) {
-                force.stop();
+
+
+
                 var d = new Date(fields.createdAt),
                     defaultRadius = 30,
                     radius = defaultRadius,
@@ -46,46 +55,23 @@ if (Meteor.isClient) {
                     newNode;
 
                 if ( l > 10) { radius = 30 + l / 1.5};
+
                 if(d3nodes.length == 0) {
-                    newNode = {x: Session.get("centerX"), y: Session.get("centerX"), radius: radius, nodeCreated: Date.now(), messageCreated: new Date(fields.messageCreated)};
+                    newNode = {x: Session.get("centerX"), y: Session.get("centerX"), radius: radius, nodeCreated: Date.now(), messageCreated: new Date(fields.messageCreated), message: fields.message};
                 } else {
-                    newNode = {x: d3nodes[0].x, y: d3nodes[0].y, radius: radius, nodeCreated: Date.now(), messageCreated: new Date(fields.messageCreated)};
+                    newNode = {x: d3nodes[0].x, y: d3nodes[0].y, radius: radius, nodeCreated: Date.now(), messageCreated: new Date(fields.messageCreated), message: fields.message};
                 }
 
                 //console.log("" + Session.get("centerX") + ", " + Session.get("centerY") + "");
                 //console.log(newNode);
                 d3nodes.push(newNode);
+
+                //console.log(d3nodes);
                 d3links.push({source: newNode, target: 0});
 
+                update()
 
-                /*
-                var SVGlink = svg.selectAll(".link")
-                    .data(d3links)
-                    .enter().append("line")
-                    .attr("class", "link")
-                    //.style({"stroke" : "#3d3d3d"});
-                */
 
-                var SVGnode = svg.selectAll(".node")
-                    .data(d3nodes)
-                    .enter().append("g")
-                    .attr("class", "node")
-                    .attr("id", newNode.index);
-
-                SVGnode.append("circle")
-                    .attr("r", radius)
-                    .style({"stroke": "#a3a3a3", "stroke-width" : 2, "fill": "#ffffff"})
-
-                SVGnode.append("text")
-                    .attr("dx", "0")
-                    .attr("dy", "0")
-                    .attr("text-anchor", "middle")
-                    .text(fields.message);
-
-                SVGnode.selectAll("text")
-                    .call(wrap, radius);
-
-                force.start();
             }
         });
     };
@@ -95,20 +81,68 @@ if (Meteor.isClient) {
         return ((now - created) / 1000);
     }
 
-    function tick() {
-        force.stop();
+    function update(){
+        console.log('update');
 
+        var SVGlinks = linkGroup.selectAll(".link")
+            .data(d3links);
+
+             SVGlinks.enter()
+                .insert("line")
+                .attr("class", "link")
+                //.style({"stroke" : "#3d3d3d"});
+
+            SVGlinks.exit().remove();
+
+
+        var SVGnodes = nodeGroup.selectAll(".node")
+                .data(d3nodes);
+
+            SVGnodes.exit().remove();
+
+        var group = SVGnodes.enter().append("g")
+                .attr("class", "node")
+                .attr("index", function (d){return d.index});
+            group.append("circle")
+                .attr("r", function (d){console.log(d); return d.radius})
+                .style({"stroke": "#a3a3a3", "stroke-width" : 2, "fill": "#ffffff"});
+
+
+
+
+        var textSelection = textGroup.selectAll(".msg").data(force.nodes());
+
+        textSelection
+            .text(function (d){return d.message})
+            .call(wrap, function (d){return d.radius} );
+
+        textSelection.enter()
+            .append("text")
+            .attr("id", function (d){ return d.index})
+            .attr("class", "msg")
+            .attr("dx", "0")
+            .attr("dy", "0")
+            .text(function (d){ return  d.message})
+            .call(wrap, function (d){return d.radius} );;
+
+        textSelection.exit().remove();
+
+
+    }
+
+
+    function tick() {
+        var q = d3.geom.quadtree(d3nodes),
+            i = 0,
+            l = d3nodes.length;
+
+        force.stop();
 
         if(d3nodes.length > 0) {
             d3nodes[0].x = Session.get("centerX");
             d3nodes[0].y = Session.get("centerY");
+            d3nodes[0].nodeCreated = Date.now();
         }
-
-
-
-        var q = d3.geom.quadtree(d3nodes),
-            i = 0,
-            l = d3nodes.length;
 
         while (++i < l ) {
             if(d3nodes[i]) {
@@ -116,14 +150,13 @@ if (Meteor.isClient) {
                 if(nodeAge > 3) {
                     q.visit(collide(d3nodes[i]));
                 }
-
-                if (nodeAge > 5) {
-                    //d3nodes.splice(1, 1)
-                    //l = d3nodes.length;
+                if (nodeAge > 60) {
+                    d3nodes.splice(i, 1);
+                    d3links.splice(i, 1);
+                    update();
                 }
             }
         }
-
 
         force.distance(function(d){
             now = Date.now();
@@ -137,29 +170,29 @@ if (Meteor.isClient) {
                 return newLength;
             }
         })
-        .charge(function(d) {
-            now = Date.now();
-            nodeAge = (now - d.nodeCreated) /1000;
+            .charge(function(d) {
+                now = Date.now();
+                nodeAge = (now - d.nodeCreated) /1000;
 
-        if (nodeAge > 1) {
-                return -100;
-            } else {
-                return -10;
-            }
+                if (nodeAge > 1) {
+                    return -100;
+                } else {
+                    return -10;
+                }
 
-        })
-        .linkStrength(function(d){
-             now = Date.now();
-             nodeAge = (now - d.source.nodeCreated) /1000;
-             newLinkStrength = initialLinkStrength * (1/nodeAge) * 0.4;
-             if (newLinkStrength != Infinity) {
-                 if (newLinkStrength > finalLinkStrength ) {
-                     return newLinkStrength;
-                 } else {
-                     return finalLinkStrength;
-                 }
-             }
-         })
+            })
+            .linkStrength(function(d){
+                now = Date.now();
+                nodeAge = (now - d.source.nodeCreated) /1000;
+                newLinkStrength = initialLinkStrength * (1/nodeAge) * 0.4;
+                if (newLinkStrength != Infinity) {
+                    if (newLinkStrength > finalLinkStrength ) {
+                        return newLinkStrength;
+                    } else {
+                        return finalLinkStrength;
+                    }
+                }
+            })
             .start();
 
         svg.selectAll(".link").attr("x1", function(d) { return d.source.x; })
@@ -167,8 +200,64 @@ if (Meteor.isClient) {
             .attr("x2", function(d) { return d.target.x; })
             .attr("y2", function(d) { return d.target.y; });
 
-        svg.selectAll(".node").attr("transform", function(d) { return "translate(" + d.x + "," + d.y + ")"; });
+        svg.selectAll(".node")
+            .attr("transform", function(d) { return "translate(" + d.x + "," + d.y + ")"; })
+
+        svg.selectAll(".msg")
+            .attr("transform", function(d) { return "translate(" + d.x + "," + d.y + ")"; })
+
+        //console.log($(d3nodes));
+        // throw Error("derp");
+
+       /*
+       svg.selectAll(".node")
+            .data(d3nodes).exit().remove();
+
+        selection = d3.selectAll("text").data(d3nodes, function(d){return d.message})
+            .text(function(d){return d.message});
+
+        */
+
+
+
+
+
+
+        //.selectAll("text").call(wrap, function(d){return d.radius} );
+
+        //console.log($(text))
+
+        //throw Error("derp");
+
+
+
     }
+
+    Template.admin.events({
+        "click #clearDbButton": function() {
+            force.stop()
+            Meteor.call("clearDb", function(){
+
+            });
+
+        },
+        "click #removeOldest": function() {
+
+            d3nodes.splice(1, 1);
+            d3links.splice(1, 1);
+            update();
+            //throw Error("derp");
+
+        },
+        "click #logData": function() {
+            console.log(d3nodes);
+            console.log(d3links);
+        }
+        ,
+        "click #update": function() {
+            update();
+        }
+    })
 
     Template.newMessage.events({
         "submit #newMessageForm": function (event) {
@@ -204,6 +293,10 @@ if (Meteor.isClient) {
 }
 
 if (Meteor.isServer) {
+
+    //process.env.METEOR_OFFLINE_CATALOG = 1;
+
+
     Accounts.config({
         forbidClientAccountCreation: true
     });

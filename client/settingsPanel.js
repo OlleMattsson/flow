@@ -38,13 +38,7 @@ if (Meteor.isClient) {
         });
     };
 
-    Template.admin.events({
-        "click #clearDbButton": function() {
-            force.stop()
-            Meteor.call("clearDb", function(){
 
-            });
 
-        }
-    })
+
 }
