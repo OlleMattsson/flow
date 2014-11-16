@@ -259,6 +259,12 @@ if (Meteor.isClient) {
     Accounts.config({
         forbidClientAccountCreation: true
     });
+
+    $(window).on("resize", function(){
+        Session.set("centerX", $(window).width() / 2);
+        Session.set("centerY", $(window).height() / 2);
+        force.size([$(window).width(), $(window).height()])
+    });
 }
 
 if (Meteor.isServer) {
