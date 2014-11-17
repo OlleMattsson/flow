@@ -128,6 +128,8 @@ if (Meteor.isClient) {
 
 
 
+
+
     // handle new messages
     Messages.find().observeChanges({
         added: function(id, fields) {
@@ -200,6 +202,15 @@ if (Meteor.isClient) {
             .html(function (d){ return  d.message});
         // remove
         textSelection.exit().remove();
+
+        typesetAndScrollToBottom($("#messageList"));
+
+    }
+
+    function typesetAndScrollToBottom($messageContainer) {
+        'use strict';
+
+        $messageContainer.scrollTop($messageContainer[0].scrollHeight);
     }
 
 

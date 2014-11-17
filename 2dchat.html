@@ -6,13 +6,13 @@
 <body>
     {{> d3}}
     {{> newMessage}}
-    {{> messageList}}
 
     {{#if currentUser}}
         {{> admin}}
     {{/if}}
 
     {{> loginButtons}}
+    {{> messageList}}
 </body>
 
 <template name="newMessage">
@@ -49,7 +49,7 @@
 
 <template name="messageList">
     <div id="messageListContainer">
-        <div id="messageList">
+        <div id="messageList" class="style-1">
 
                 {{#each messages}}
                     <p>{{formattedTime}} - {{message}}</p>
