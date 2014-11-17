@@ -183,7 +183,7 @@ if (Meteor.isClient) {
                 .attr("r", function (d){return d.radius })
                 .style({"stroke": "#949494", "stroke-width" : 1})
                 .attr('fill', 'url(#gradient)')
-                .attr("filter", "url(#dropshadow)");;
+                .attr("filter", "url(#dropshadow)");
         // remove
         SVGnodes.exit().remove();
 
@@ -331,6 +331,9 @@ if (Meteor.isClient) {
 
         "click #update": function() {
             update();
+        },
+        "click #messageLog": function() {
+            $("#messageList").toggle();
         }
     });
 
