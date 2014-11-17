@@ -53,6 +53,7 @@ if (Meteor.isClient) {
         linkGroup = svg.append("g").attr("id", "linkGroup"),
         nodeGroup = svg.append("g").attr("id", "nodeGroup");
 
+        // Define SVG gradient
         var gradient = svg.append("svg:defs")
             .append("svg:linearGradient")
             .attr("id", "gradient")
@@ -71,6 +72,42 @@ if (Meteor.isClient) {
             .attr("offset", "100%")
             .attr("stop-color", "#c2c2c2")
             .attr("stop-opacity", 1);
+
+
+        // Define SVG Dropshadow
+        var defs = svg.append("defs");
+
+        var filter = defs.append("filter")
+            .attr("id", "dropshadow")
+
+        filter.append("feGaussianBlur")
+            .attr("in", "SourceAlpha")
+            .attr("stdDeviation", 4)
+            .attr("result", "blur");
+        filter.append("feOffset")
+            .attr("in", "blur")
+            .attr("dx", 2)
+            .attr("dy", 2)
+            .attr("result", "offsetBlur")
+        filter.append("feFlood")
+            .attr("in", "offsetBlur")
+            .attr("flood-color", "#3d3d3d")
+            .attr("flood-opacity", "0.5")
+            .attr("result", "offsetColor");
+        filter.append("feComposite")
+            .attr("in", "offsetColor")
+            .attr("in2", "offsetBlur")
+            .attr("operator", "in")
+            .attr("result", "offsetBlur");
+
+        var feMerge = filter.append("feMerge");
+
+        feMerge.append("feMergeNode")
+            .attr("in", "offsetBlur")
+        feMerge.append("feMergeNode")
+            .attr("in", "SourceGraphic");
+
+
 
         // start d3
         force = d3.layout.force()
@@ -143,7 +180,8 @@ if (Meteor.isClient) {
             groupEnter.append("circle")
                 .attr("r", function (d){return d.radius })
                 .style({"stroke": "#949494", "stroke-width" : 1})
-                .attr('fill', 'url(#gradient)');;
+                .attr('fill', 'url(#gradient)')
+                .attr("filter", "url(#dropshadow)");;
         // remove
         SVGnodes.exit().remove();
 
