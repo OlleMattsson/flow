@@ -312,6 +312,20 @@ if (Meteor.isClient) {
         }
     });
 
+    Template.messageList.helpers({
+        messages:  function() {
+            return Messages.find({});
+        },
+        formattedTime: function(){
+            var d = moment.unix(this.messageCreated).format("YYYY-MM-DD hh:mm:ss");
+            //console.log(d);
+            //d.;
+            return d;
+
+
+        }
+    });
+
 
 
 

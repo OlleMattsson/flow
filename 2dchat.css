@@ -4,11 +4,12 @@ body, html {
     height:100%;
     overflow:hidden;
     font-family: 'Ubuntu', sans-serif;
+    width:100%;
 
 }
 
 body {
-    background-image: radial-gradient(transparent, rgba(0,0,0,.5)), url(/lightbluenosie1.png);
+    background-image: radial-gradient(transparent, rgba(0,0,0,.5)), url(/linen.jpg);
     min-height:100%;
 }
 
@@ -35,6 +36,12 @@ button:focus {
     width:75%;
 }
 
+#newMessageForm label{
+    margin-top: 5px;
+    font-size: 15px;
+    float: left;
+}
+
 #newMessageField {
     width:100%;
     line-height: 45px;
@@ -47,12 +54,6 @@ button:focus {
     background: rgba(255,255,255,0.5);
 }
 
-#newMessageForm label{
-    margin-top: 5px;
-    font-size: 15px;
-    float: left;
-    font-family:"Helvetica Neue Light", "Lucida Grande", "Calibri", "Arial", sans-serif;
-}
 
 #settingsPanel {
     position:absolute;
@@ -87,4 +88,29 @@ button:focus {
     position:absolute;
     display:block;
     text-align: center;
+}
+#messageListContainer{
+    height:500px;
+    width:100%;
+    display:block;
+    position:absolute;
+    padding:0px;
+    margin:0px;
+    bottom: 105px;
+}
+
+#messageList {
+    height:500px;
+    width:75%;
+    margin-left: auto;
+    margin-right:auto;
+    padding:0px;
+    border:0px solid crimson;
+    overflow:hidden;
+}
+
+#messageList p {
+    margin:5px 0px 5px 0px;
+    color: #cccccc;
+    font-size:13px;
 }

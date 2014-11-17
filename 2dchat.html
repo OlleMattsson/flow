@@ -6,9 +6,12 @@
 <body>
     {{> d3}}
     {{> newMessage}}
+    {{> messageList}}
+
     {{#if currentUser}}
-    {{> admin}}
+        {{> admin}}
     {{/if}}
+
     {{> loginButtons}}
 </body>
 
@@ -41,6 +44,18 @@
         <br/>
         <div id="strengthSlider"><label for="strengthSlider">0.1</label></div>
         <br/>
+    </div>
+</template>
+
+<template name="messageList">
+    <div id="messageListContainer">
+        <div id="messageList">
+
+                {{#each messages}}
+                    <p>{{formattedTime}} - {{message}}</p>
+                {{/each}}
+
+        </div>
     </div>
 </template>
 
